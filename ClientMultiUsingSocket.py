@@ -7,6 +7,16 @@ import re
 import socket
 import socket_adress
 
+"""
+socket_adress.py
+
+SERVER_IP = 'Server External IP'
+SERVER_PORT = Server port_number
+SIZE = Size of sending data
+SERVER_ADDR = (SERVER_IP, SERVER_PORT)
+
+"""
+
 
 SERVER_IP = socket_adress.SERVER_IP
 SERVER_PORT = socket_adress.SERVER_PORT
@@ -122,7 +132,6 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
 
         pygame.draw.circle(main_display, black, (my_x, my_y), 10)
         pygame.draw.circle(main_display, red, (othersX, othersY), 10)
-
 
         pygame.display.update()  # 화면을 업데이트한다
         clock.tick(fps)  # 화면 표시 회수 설정만큼 루프의 간격을 둔다
