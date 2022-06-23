@@ -100,17 +100,27 @@ def keyCheck():
         my_y_velo = 0
 
 
-def read():
+def receive():
     global othersX, othersY
 
     while True:
         client_location = client_socket.recv(SIZE)  # 클라이언트가 보낸 메시지 반환
-        print('받은거' + client_location.decode())
+        print('받은거 ' + client_location.decode())
         AllRex = r'^(.+)[ \t](.+)'
         RAll = re.compile(AllRex)
         MAll = RAll.search(client_location.decode())
         othersX = int(MAll.group(1))
         othersY = int(MAll.group(2))
+
+        pygame.draw.circle(main_display, red, (othersX, othersY), 10)
+
+
+def send():
+    x = "%03d" % my_x
+    y = "%03d" % my_y
+    location = f'{x} {y}'
+    print('보내는거 ' + location)
+    client_socket.sendall(location.encode())
 
 
 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
@@ -120,23 +130,17 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
     client_socket, client_addr = server_socket.accept()
     print('준비완료')
 
-    threading.Thread(target=read).start()
+    threading.Thread(target=receive).start()
 
     while True:
-        main_display.fill(white)  # displaysurf를 하얀색으로 채운다
+        main_display.fill(white)
 
         keyCheck()
 
-        x = "%03d" % my_x
-        y = "%03d" % my_y
-        location = f'{x} {y}'
-        print('보내는거' + str(location.encode()))
-        client_socket.sendall(location.encode())
+        send()
 
         pygame.draw.circle(main_display, black, (my_x, my_y), 10)
         pygame.draw.circle(main_display, red, (othersX, othersY), 10)
 
         pygame.display.update()  # 화면을 업데이트한다
         clock.tick(fps)  # 화면 표시 회수 설정만큼 루프의 간격을 둔다
-
-

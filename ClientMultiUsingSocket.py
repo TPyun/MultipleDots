@@ -100,16 +100,26 @@ def keyCheck():
         my_y_velo = 0
 
 
-def read():
+def receive():
     global othersX, othersY
     while True:
         server_location = server_socket.recv(SIZE)  # 서버가 보낸 메시지 반환
-        print('받은거' + server_location.decode())
+        print('받은거 ' + server_location.decode())
         AllRex = r'^(.+)[ \t](.+)'
         RAll = re.compile(AllRex)
         MAll = RAll.search(server_location.decode())
         othersX = int(MAll.group(1))
         othersY = int(MAll.group(2))
+
+        pygame.draw.circle(main_display, red, (othersX, othersY), 10)
+
+
+def send():
+    x = "%03d" % my_x
+    y = "%03d" % my_y
+    location = f'{x} {y}'
+    print('보내는거 ' + location)
+    server_socket.send(location.encode())
 
 
 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
@@ -117,18 +127,14 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
     print('접속됨')
     print(server_socket.getsockname())
 
-    threading.Thread(target=read).start()
+    threading.Thread(target=receive).start()
 
     while True:
-        main_display.fill(white)  # displaysurf를 하얀색으로 채운다
+        main_display.fill(white)
 
         keyCheck()
 
-        x = "%03d" % my_x
-        y = "%03d" % my_y
-        location = f'{x} {y}'
-        print('보내는거' + str(location.encode()))
-        server_socket.send(location.encode())
+        send()
 
         pygame.draw.circle(main_display, black, (my_x, my_y), 10)
         pygame.draw.circle(main_display, red, (othersX, othersY), 10)
