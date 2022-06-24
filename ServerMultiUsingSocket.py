@@ -6,6 +6,7 @@ import threading
 import re
 import socket
 import socket_adress
+import math
 
 """
 socket_adress.py
@@ -16,7 +17,6 @@ SIZE = Size of sending data
 ADDR = (IP, PORT)
 
 """
-
 
 IP = socket_adress.IP
 PORT = socket_adress.SERVER_PORT
@@ -40,7 +40,10 @@ PIXEL_PER_METER = (10.0 / 0.2)  # 10 pixel 20 cm
 RUN_SPEED_KMPH = 0.6  # Km / Hour
 RUN_SPEED_MPM = (RUN_SPEED_KMPH * 1000.0 / 60.0)
 RUN_SPEED_MPS = (RUN_SPEED_MPM / 60.0)
-RUN_SPEED_PPS = (RUN_SPEED_MPS * PIXEL_PER_METER)
+RUN_SPEED_PPS = int(RUN_SPEED_MPS * PIXEL_PER_METER)
+
+FRICTION = int(RUN_SPEED_MPS / 3 * PIXEL_PER_METER)
+
 
 my_x_velo = 0
 my_y_velo = 0
@@ -49,15 +52,17 @@ my_x = 300
 my_y = 200
 othersX = 0
 othersY = 0
-frame_time = 0
+SIGHT = 0
+WAY_TO_SEE = 0
 
 
 def keyCheck():
-    global my_x, my_y, my_x_velo, my_y_velo, current_time, frame_time
+    global my_x, my_y, my_x_velo, my_y_velo, current_time, SIGHT
     for event in pygame.event.get():
         if event.type == QUIT:
             pygame.quit()
             sys.exit()
+
     keys_press = pygame.key.get_pressed()
     if keys_press[pygame.K_LEFT]:
         my_x_velo -= RUN_SPEED_PPS
@@ -68,17 +73,26 @@ def keyCheck():
     if keys_press[pygame.K_DOWN]:
         my_y_velo += RUN_SPEED_PPS
 
-    max = 100
-    min = -100
+    if my_x_velo > 0:
+        my_x_velo -= FRICTION
+    elif my_x_velo < 0:
+        my_x_velo += FRICTION
+    if my_y_velo > 0:
+        my_y_velo -= FRICTION
+    elif my_y_velo < 0:
+        my_y_velo += FRICTION
 
-    if my_x_velo >= max:
-        my_x_velo = max
-    elif my_x_velo <= min:
-        my_x_velo = min
-    if my_y_velo >= max:
-        my_y_velo = max
-    elif my_y_velo <= min:
-        my_y_velo = min
+    max_vel = 100
+    min_vel = -100
+
+    if my_x_velo >= max_vel:
+        my_x_velo = max_vel
+    elif my_x_velo <= min_vel:
+        my_x_velo = min_vel
+    if my_y_velo >= max_vel:
+        my_y_velo = max_vel
+    elif my_y_velo <= min_vel:
+        my_y_velo = min_vel
 
     frame_time = time.time() - current_time
     current_time += frame_time
@@ -99,13 +113,36 @@ def keyCheck():
         my_y = 0
         my_y_velo = 0
 
+    if keys_press[pygame.K_a]:
+        SIGHT -= WAY_TO_SEE
+    if keys_press[pygame.K_d]:
+        SIGHT += WAY_TO_SEE
+
+    if SIGHT > 360:
+        SIGHT = SIGHT - 360
+
 
 def receive():
     global othersX, othersY
+    while True:
+        print(client_socket.recv(SIZE))
 
+        client_location = client_socket.recv(SIZE)  # 클라이언트가 보낸 메시지 반환
+        #print('받은거 ' + client_location.decode())
+        AllRex = r'^(.+)[ \t](.+)'
+        RAll = re.compile(AllRex)
+        MAll = RAll.search(client_location.decode())
+        othersX = int(MAll.group(1))
+        othersY = int(MAll.group(2))
+
+        pygame.draw.circle(main_display, red, (othersX, othersY), 10)
+
+
+def receive_one():
+    global othersX, othersY
     while True:
         client_location = client_socket.recv(SIZE)  # 클라이언트가 보낸 메시지 반환
-        print('받은거 ' + client_location.decode())
+        # print('받은거 ' + client_location.decode())
         AllRex = r'^(.+)[ \t](.+)'
         RAll = re.compile(AllRex)
         MAll = RAll.search(client_location.decode())
@@ -116,11 +153,13 @@ def receive():
 
 
 def send():
-    x = "%03d" % my_x
-    y = "%03d" % my_y
-    location = f'{x} {y}'
-    print('보내는거 ' + location)
-    client_socket.sendall(location.encode())
+    while True:
+        x = "%03d" % my_x
+        y = "%03d" % my_y
+        location = f'{x} {y}'
+        # print('보내는거 ' + location)
+        client_socket.sendall(location.encode())
+        time.sleep(0.005)
 
 
 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
@@ -131,13 +170,26 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
     print('준비완료')
 
     threading.Thread(target=receive).start()
+    threading.Thread(target=send).start()
 
     while True:
         main_display.fill(white)
 
         keyCheck()
 
-        send()
+
+
+
+
+
+        # pol_x = math.sin(my_x * 100)
+        # pol_y = math.sin(my_y * 100)
+        #
+        #
+        # pygame.draw.circle(main_display, red, (pol_x, pol_y), 5)
+        #
+        #
+        # pygame.draw.polygon(main_display, black, [[my_x, my_y - 25], [my_x - 8, my_y - 15], [my_x + 8, my_y - 15]])
 
         pygame.draw.circle(main_display, black, (my_x, my_y), 10)
         pygame.draw.circle(main_display, red, (othersX, othersY), 10)
