@@ -44,7 +44,6 @@ RUN_SPEED_PPS = int(RUN_SPEED_MPS * PIXEL_PER_METER)
 
 FRICTION = int(RUN_SPEED_MPS / 3 * PIXEL_PER_METER)
 
-
 my_x_velo = 0
 my_y_velo = 0
 current_time = time.time()
@@ -55,10 +54,56 @@ othersY = 0
 SIGHT = 270
 WAY_TO_SEE = 5
 othersSight = 0
+bullet_fired = False
+shoot = False
+fired_sight = 0
+fired_bullet_x = 0
+fired_bullet_y = 0
+fired_my_x_velo = 0
+fired_my_y_velo = 0
+othersBulletX = 0
+othersBulletY = 0
+
+
+def receive():
+    global othersX, othersY, othersSight, othersBulletX, othersBulletY
+    while True:
+        client_location = client_socket.recv(SIZE)  # 클라이언트가 보낸 메시지 반환
+        # print('받은거 ' + client_location.decode())
+        AllRex = r'^(.+)[ \t](.+)[ \t](.+)[ \t](.+)'
+        RAll = re.compile(AllRex)
+        MAll = RAll.search(client_location.decode())
+        othersX = int(MAll.group(1))
+        othersY = int(MAll.group(2))
+        othersBulletX = int(MAll.group(3))
+        othersBulletY = int(MAll.group(4))
+        # pygame.draw.circle(main_display, red, (othersX, othersY), 10)
+
+
+def send():
+    while True:
+        x = "%03d" % my_x
+        y = "%03d" % my_y
+        bullet_x = "%03d" % fired_bullet_x
+        bullet_y = "%03d" % fired_bullet_y
+        location = f'{x} {y} {bullet_x} {bullet_y}'
+        # print('보내는거 ' + location)
+        client_socket.sendall(location.encode())
+        time.sleep(0.005)
+
+
+def connect_as_server():
+    server_soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server_soc.bind(ADDR)  # 주소 바인딩
+    print('클라이언트를 기다리는 중')
+    server_soc.listen()  # 클라이언트의 요청을 받을 준비
+    client_soc, client_addr = server_soc.accept()
+    print('준비완료')
+    return client_soc
 
 
 def keyCheck():
-    global my_x, my_y, my_x_velo, my_y_velo, current_time, SIGHT
+    global my_x, my_y, my_x_velo, my_y_velo, current_time, SIGHT, bullet_fired, frame_time
     for event in pygame.event.get():
         if event.type == QUIT:
             pygame.quit()
@@ -126,57 +171,54 @@ def keyCheck():
     elif degree > 1:
         SIGHT -= 360
 
-
-def receive():
-    global othersX, othersY, othersSight
-    while True:
-        client_location = client_socket.recv(SIZE)  # 클라이언트가 보낸 메시지 반환
-        # print('받은거 ' + client_location.decode())
-        AllRex = r'^(.+)[ \t](.+)[ \t](.+)'
-        RAll = re.compile(AllRex)
-        MAll = RAll.search(client_location.decode())
-        othersX = int(MAll.group(1))
-        othersY = int(MAll.group(2))
-        othersSight = int(MAll.group(3))
-
-        pygame.draw.circle(main_display, red, (othersX, othersY), 10)
+    if keys_press[pygame.K_SPACE]:
+        bullet_fired = True
 
 
-def send():
-    while True:
-        x = "%03d" % my_x
-        y = "%03d" % my_y
-        s = "%03d" % SIGHT
-        location = f'{x} {y} {s}'
-        # print('보내는거 ' + location)
-        client_socket.sendall(location.encode())
-        time.sleep(0.005)
+def draw_my_ball():
+    pygame.draw.circle(main_display, black, (my_x, my_y), 12)
 
 
-with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
-    server_socket.bind(ADDR)  # 주소 바인딩
-    print('클라이언트를 기다리는 중')
-    server_socket.listen()  # 클라이언트의 요청을 받을 준비
-    client_socket, client_addr = server_socket.accept()
-    print('준비완료')
+def draw_others_ball():
+    pygame.draw.circle(main_display, red, (othersBulletX, othersBulletY), 4)
+    pygame.draw.circle(main_display, red, (othersX, othersY), 12)
 
-    threading.Thread(target=receive).start()
-    threading.Thread(target=send).start()
 
-    while True:
-        main_display.fill(white)
-        print(SIGHT)
-        keyCheck()
+def draw_bullet():
+    global fired_sight, fired_bullet_x, fired_bullet_y, fired_my_x_velo, fired_my_y_velo, bullet_fired
+    if not bullet_fired:
+        degree = math.pi * 2 * SIGHT / 360
+        bullet_x = 18 * math.cos(degree) + my_x
+        bullet_y = 18 * math.sin(degree) + my_y
+        pygame.draw.circle(main_display, black, (bullet_x, bullet_y), 4)
+        fired_bullet_x = bullet_x
+        fired_bullet_y = bullet_y
+        fired_my_x_velo = my_x_velo
+        fired_my_y_velo = my_y_velo
+        fired_sight = SIGHT
+    else:
+        degree = math.pi * 2 * fired_sight / 360
+        bullet_x_speed = math.cos(degree) * 5
+        bullet_y_speed = math.sin(degree) * 5
 
-        pol_x = 18 * math.cos(math.pi * 2 * SIGHT / 360) + my_x
-        pol_y = 18 * math.sin(math.pi * 2 * SIGHT / 360) + my_y
-        pygame.draw.circle(main_display, black, (pol_x, pol_y), 4)
-        pygame.draw.circle(main_display, black, (my_x, my_y), 12)
+        fired_bullet_x += fired_my_x_velo * frame_time + bullet_x_speed
+        fired_bullet_y += fired_my_y_velo * frame_time + bullet_y_speed
+        pygame.draw.circle(main_display, black, (fired_bullet_x, fired_bullet_y), 4)
+        if fired_bullet_x < 0 or fired_bullet_x > width or fired_bullet_y < 0 or fired_bullet_y > height:
+            bullet_fired = False
 
-        others_sight_x = 18 * math.cos(math.pi * 2 * othersSight / 360) + othersX
-        others_sight_y = 18 * math.sin(math.pi * 2 * othersSight / 360) + othersY
-        pygame.draw.circle(main_display, red, (others_sight_x, others_sight_y), 4)
-        pygame.draw.circle(main_display, red, (othersX, othersY), 12)
 
-        pygame.display.update()  # 화면을 업데이트한다
-        clock.tick(fps)  # 화면 표시 회수 설정만큼 루프의 간격을 둔다
+client_socket = connect_as_server()
+threading.Thread(target=receive).start()
+threading.Thread(target=send).start()
+
+while True:
+    main_display.fill(white)
+
+    keyCheck()
+    draw_bullet()
+    draw_my_ball()
+    draw_others_ball()
+
+    pygame.display.update()  # 화면을 업데이트한다
+    clock.tick(fps)  # 화면 표시 회수 설정만큼 루프의 간격을 둔다
