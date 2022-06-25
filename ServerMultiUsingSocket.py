@@ -52,8 +52,9 @@ my_x = 300
 my_y = 200
 othersX = 0
 othersY = 0
-SIGHT = 0
-WAY_TO_SEE = 0
+SIGHT = 270
+WAY_TO_SEE = 5
+othersSight = 0
 
 
 def keyCheck():
@@ -118,36 +119,25 @@ def keyCheck():
     if keys_press[pygame.K_d]:
         SIGHT += WAY_TO_SEE
 
-    if SIGHT > 360:
-        SIGHT = SIGHT - 360
+    degree = SIGHT / 360
+
+    if degree < 0:
+        SIGHT += 360
+    elif degree > 1:
+        SIGHT -= 360
 
 
 def receive():
-    global othersX, othersY
-    while True:
-        print(client_socket.recv(SIZE))
-
-        client_location = client_socket.recv(SIZE)  # 클라이언트가 보낸 메시지 반환
-        #print('받은거 ' + client_location.decode())
-        AllRex = r'^(.+)[ \t](.+)'
-        RAll = re.compile(AllRex)
-        MAll = RAll.search(client_location.decode())
-        othersX = int(MAll.group(1))
-        othersY = int(MAll.group(2))
-
-        pygame.draw.circle(main_display, red, (othersX, othersY), 10)
-
-
-def receive_one():
-    global othersX, othersY
+    global othersX, othersY, othersSight
     while True:
         client_location = client_socket.recv(SIZE)  # 클라이언트가 보낸 메시지 반환
         # print('받은거 ' + client_location.decode())
-        AllRex = r'^(.+)[ \t](.+)'
+        AllRex = r'^(.+)[ \t](.+)[ \t](.+)'
         RAll = re.compile(AllRex)
         MAll = RAll.search(client_location.decode())
         othersX = int(MAll.group(1))
         othersY = int(MAll.group(2))
+        othersSight = int(MAll.group(3))
 
         pygame.draw.circle(main_display, red, (othersX, othersY), 10)
 
@@ -156,7 +146,8 @@ def send():
     while True:
         x = "%03d" % my_x
         y = "%03d" % my_y
-        location = f'{x} {y}'
+        s = "%03d" % SIGHT
+        location = f'{x} {y} {s}'
         # print('보내는거 ' + location)
         client_socket.sendall(location.encode())
         time.sleep(0.005)
@@ -174,25 +165,18 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
 
     while True:
         main_display.fill(white)
-
+        print(SIGHT)
         keyCheck()
 
+        pol_x = 18 * math.cos(math.pi * 2 * SIGHT / 360) + my_x
+        pol_y = 18 * math.sin(math.pi * 2 * SIGHT / 360) + my_y
+        pygame.draw.circle(main_display, black, (pol_x, pol_y), 4)
+        pygame.draw.circle(main_display, black, (my_x, my_y), 12)
 
-
-
-
-
-        # pol_x = math.sin(my_x * 100)
-        # pol_y = math.sin(my_y * 100)
-        #
-        #
-        # pygame.draw.circle(main_display, red, (pol_x, pol_y), 5)
-        #
-        #
-        # pygame.draw.polygon(main_display, black, [[my_x, my_y - 25], [my_x - 8, my_y - 15], [my_x + 8, my_y - 15]])
-
-        pygame.draw.circle(main_display, black, (my_x, my_y), 10)
-        pygame.draw.circle(main_display, red, (othersX, othersY), 10)
+        others_sight_x = 18 * math.cos(math.pi * 2 * othersSight / 360) + othersX
+        others_sight_y = 18 * math.sin(math.pi * 2 * othersSight / 360) + othersY
+        pygame.draw.circle(main_display, red, (others_sight_x, others_sight_y), 4)
+        pygame.draw.circle(main_display, red, (othersX, othersY), 12)
 
         pygame.display.update()  # 화면을 업데이트한다
         clock.tick(fps)  # 화면 표시 회수 설정만큼 루프의 간격을 둔다
