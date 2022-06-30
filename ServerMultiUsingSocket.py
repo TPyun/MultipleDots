@@ -28,7 +28,8 @@ height = 400
 white = (255, 255, 255)
 black = (0, 0, 0)
 red = (255, 0, 0)
-fps = 60
+blue = (0, 0, 255)
+fps = 200
 
 pygame.init()  # 초기화
 
@@ -42,7 +43,7 @@ RUN_SPEED_MPM = (RUN_SPEED_KMPH * 1000.0 / 60.0)
 RUN_SPEED_MPS = (RUN_SPEED_MPM / 60.0)
 RUN_SPEED_PPS = int(RUN_SPEED_MPS * PIXEL_PER_METER)
 
-FRICTION = int(RUN_SPEED_MPS / 3 * PIXEL_PER_METER)
+FRICTION = int(RUN_SPEED_MPS / 3 * PIXEL_PER_METER * 30)
 
 my_x_velo = 0
 my_y_velo = 0
@@ -52,7 +53,7 @@ my_y = 200
 othersX = 0
 othersY = 0
 SIGHT = 270
-WAY_TO_SEE = 5
+WAY_TO_SEE = 400
 othersSight = 0
 bullet_fired = False
 shoot = False
@@ -63,6 +64,9 @@ fired_my_x_velo = 0
 fired_my_y_velo = 0
 othersBulletX = 0
 othersBulletY = 0
+my_hit = False
+others_hit = False
+frame_time = 1
 
 
 def receive():
@@ -111,25 +115,31 @@ def keyCheck():
 
     keys_press = pygame.key.get_pressed()
     if keys_press[pygame.K_LEFT]:
-        my_x_velo -= RUN_SPEED_PPS
+        my_x_velo -= (RUN_SPEED_PPS * frame_time * 100)
     if keys_press[pygame.K_RIGHT]:
-        my_x_velo += RUN_SPEED_PPS
+        my_x_velo += (RUN_SPEED_PPS * frame_time * 100)
     if keys_press[pygame.K_UP]:
-        my_y_velo -= RUN_SPEED_PPS
+        my_y_velo -= (RUN_SPEED_PPS * frame_time * 100)
     if keys_press[pygame.K_DOWN]:
-        my_y_velo += RUN_SPEED_PPS
+        my_y_velo += (RUN_SPEED_PPS * frame_time * 100)
 
     if my_x_velo > 0:
-        my_x_velo -= FRICTION
+        my_x_velo -= (FRICTION * frame_time)
     elif my_x_velo < 0:
-        my_x_velo += FRICTION
+        my_x_velo += (FRICTION * frame_time)
     if my_y_velo > 0:
-        my_y_velo -= FRICTION
+        my_y_velo -= (FRICTION * frame_time)
     elif my_y_velo < 0:
-        my_y_velo += FRICTION
+        my_y_velo += (FRICTION * frame_time)
+    # print(my_x_velo, RUN_SPEED_PPS * frame_time * 100)
 
-    max_vel = 100
-    min_vel = -100
+    if 0 < pow(my_x_velo, 2) < 1:
+        my_x_velo = 0
+    if 0 < pow(my_y_velo, 2) < 1:
+        my_y_velo = 0
+
+    max_vel = 150
+    min_vel = -150
 
     if my_x_velo >= max_vel:
         my_x_velo = max_vel
@@ -142,6 +152,8 @@ def keyCheck():
 
     frame_time = time.time() - current_time
     current_time += frame_time
+    # if frame_time != 0:
+    #     print(int(10000 / int(frame_time * 10000)))
 
     my_x += my_x_velo * frame_time
     my_y += my_y_velo * frame_time
@@ -160,9 +172,9 @@ def keyCheck():
         my_y_velo = 0
 
     if keys_press[pygame.K_a]:
-        SIGHT -= WAY_TO_SEE
+        SIGHT -= WAY_TO_SEE * frame_time
     if keys_press[pygame.K_d]:
-        SIGHT += WAY_TO_SEE
+        SIGHT += WAY_TO_SEE * frame_time
 
     degree = SIGHT / 360
 
@@ -184,13 +196,14 @@ def draw_others_ball():
     pygame.draw.circle(main_display, red, (othersX, othersY), 12)
 
 
-def draw_bullet():
+def draw_my_bullet():
     global fired_sight, fired_bullet_x, fired_bullet_y, fired_my_x_velo, fired_my_y_velo, bullet_fired
     if not bullet_fired:
         degree = math.pi * 2 * SIGHT / 360
         bullet_x = 18 * math.cos(degree) + my_x
         bullet_y = 18 * math.sin(degree) + my_y
         pygame.draw.circle(main_display, black, (bullet_x, bullet_y), 4)
+
         fired_bullet_x = bullet_x
         fired_bullet_y = bullet_y
         fired_my_x_velo = my_x_velo
@@ -198,14 +211,28 @@ def draw_bullet():
         fired_sight = SIGHT
     else:
         degree = math.pi * 2 * fired_sight / 360
-        bullet_x_speed = math.cos(degree) * 5
-        bullet_y_speed = math.sin(degree) * 5
+        bullet_x_speed = math.cos(degree) * 500
+        bullet_y_speed = math.sin(degree) * 500
 
-        fired_bullet_x += fired_my_x_velo * frame_time + bullet_x_speed
-        fired_bullet_y += fired_my_y_velo * frame_time + bullet_y_speed
+        fired_bullet_x += (fired_my_x_velo + bullet_x_speed) * frame_time
+        fired_bullet_y += (fired_my_y_velo + bullet_y_speed) * frame_time
         pygame.draw.circle(main_display, black, (fired_bullet_x, fired_bullet_y), 4)
         if fired_bullet_x < 0 or fired_bullet_x > width or fired_bullet_y < 0 or fired_bullet_y > height:
             bullet_fired = False
+
+
+def rebirth():
+    global my_x, my_y
+    my_x = width / 2
+    my_y = height / 2
+
+
+def crash_detect():
+    global my_hit, others_hit
+    my_hit = others_hit = False
+    if my_x - 10 < othersBulletX < my_x + 10 and my_y - 10 < othersBulletY < my_y + 10:
+        my_hit = True
+        rebirth()
 
 
 client_socket = connect_as_server()
@@ -214,9 +241,9 @@ threading.Thread(target=send).start()
 
 while True:
     main_display.fill(white)
-
+    crash_detect()
     keyCheck()
-    draw_bullet()
+    draw_my_bullet()
     draw_my_ball()
     draw_others_ball()
 
