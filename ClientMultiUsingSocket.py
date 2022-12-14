@@ -44,28 +44,36 @@ RUN_SPEED_PPS = int(RUN_SPEED_MPS * PIXEL_PER_METER)
 
 FRICTION = int(RUN_SPEED_MPS / 3 * PIXEL_PER_METER * 30)
 
-my_x_velo = 0
-my_y_velo = 0
+
 current_time = time.time()
 my_x = 300
 my_y = 200
+my_x_velo = 0
+my_y_velo = 0
+
 othersX = 0
-othersY = 0
+othersY = 500
+othersBulletX = 0
+othersBulletY = 500
+
 SIGHT = 270
 WAY_TO_SEE = 400
 othersSight = 0
 bullet_fired = False
 shoot = False
 fired_sight = 0
+
 fired_bullet_x = 0
 fired_bullet_y = 0
 fired_my_x_velo = 0
 fired_my_y_velo = 0
-othersBulletX = 0
-othersBulletY = 0
+
 my_hit = False
 others_hit = False
 frame_time = 1
+connecting = False
+
+server_socket = None
 
 
 def receive():
@@ -111,7 +119,6 @@ def keyCheck():
             pygame.quit()
             sys.exit()
 
-    keys_press = pygame.key.get_pressed()
     if keys_press[pygame.K_LEFT]:
         my_x_velo -= (RUN_SPEED_PPS * frame_time * 100)
     if keys_press[pygame.K_RIGHT]:
@@ -217,7 +224,7 @@ def draw_my_bullet():
             bullet_fired = False
 
 
-def rebirth():
+def respawn():
     global my_x, my_y
     my_x = width / 2
     my_y = height / 2
@@ -228,20 +235,29 @@ def crash_detect():
     my_hit = others_hit = False
     if my_x - 10 < othersBulletX < my_x + 10 and my_y - 10 < othersBulletY < my_y + 10:
         my_hit = True
-        rebirth()
+        respawn()
 
-
-server_socket = connect_as_client()
-threading.Thread(target=receive).start()
-threading.Thread(target=send).start()
 
 while True:
+    keys_press = pygame.key.get_pressed()
+    if keys_press[pygame.K_c] and connecting is False:
+        server_socket = connect_as_client()
+        threading.Thread(target=receive).start()
+        threading.Thread(target=send).start()
+        connecting = True
+
+    if keys_press[pygame.K_x] and connecting is True:
+        server_socket.close()
+        connecting = False
+
     main_display.fill(white)
-    crash_detect()
     keyCheck()
     draw_my_bullet()
     draw_my_ball()
-    draw_others_ball()
+
+    if connecting:
+        crash_detect()
+        draw_others_ball()
 
     pygame.display.update()  # 화면을 업데이트한다
     clock.tick(fps)  # 화면 표시 회수 설정만큼 루프의 간격을 둔다
