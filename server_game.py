@@ -258,6 +258,7 @@ def accept_client():
 def send_and_recv(client_socket, client_port):
     # send client port
     client_socket.sendall(str(client_port).encode())
+    print("send port to client")
     while True:
         if quit_event.is_set():
             return
@@ -266,18 +267,18 @@ def send_and_recv(client_socket, client_port):
             players_info_json = json.dumps(players_info)
             send_info = players_info_json.encode()
             client_socket.sendall(send_info)
+            print("send info to client")
 
             # recv
-            for key, value in players_info.items():
-                if key == client_port:
-                    recv_info_json = client_socket.recv(1024).decode()
-                    recv_info = json.loads(recv_info_json.replace("'", "\""))
-                    player_hp = players_info[key][HP]
-                    recv_info.append(player_hp)
-                    players_info[key] = recv_info
+            recv_info_json = client_socket.recv(1024).decode()
+            recv_info = json.loads(recv_info_json.replace("'", "\""))
+            player_hp = players_info[client_port][HP]
+            recv_info.append(player_hp)
+            players_info[client_port] = recv_info
+            print("recv info to client")
 
         except Exception as e:
-            print("error occurred during send recv" + str(e))
+            print("error occurred during send recv " + str(e))
             players_info.pop(client_port)
             return
 
