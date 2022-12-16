@@ -3,11 +3,11 @@ import sys  # 외장 모듈
 from pygame.locals import *  # QUIT 등의 pygame 상수들을 로드한다.
 import time
 import threading
-import re
 import socket
 import socket_address
 import math
 import json
+
 """
 socket_address.py
 
@@ -30,33 +30,21 @@ black = (0, 0, 0)
 red = (255, 0, 0)
 fps = 120
 
-pygame.init()  # 초기화
-
-pygame.display.set_caption('Two Balls')
-main_display = pygame.display.set_mode((width, height), 0, 32)
-clock = pygame.time.Clock()  # 시간 설정
-
 PIXEL_PER_METER = (10.0 / 0.2)  # 10 pixel 20 cm
 RUN_SPEED_KMPH = 0.6  # Km / Hour
 RUN_SPEED_MPM = (RUN_SPEED_KMPH * 1000.0 / 60.0)
 RUN_SPEED_MPS = (RUN_SPEED_MPM / 60.0)
 RUN_SPEED_PPS = int(RUN_SPEED_MPS * PIXEL_PER_METER)
-
 FRICTION = int(RUN_SPEED_MPS / 3 * PIXEL_PER_METER * 30)
 
-
+frame_time = 0
 current_time = time.time()
 my_x = 300
 my_y = 200
 my_x_velo = 0
 my_y_velo = 0
 
-othersX = 0
-othersY = 500
-othersBulletX = 0
-othersBulletY = 500
-
-SIGHT = 270
+sight = 270
 WAY_TO_SEE = 400
 othersSight = 0
 bullet_fired = False
@@ -68,9 +56,6 @@ fired_bullet_y = 0
 fired_my_x_velo = 0
 fired_my_y_velo = 0
 
-my_hit = False
-others_hit = False
-frame_time = 1
 connected = False
 try_connect = False
 server_socket = None
@@ -81,7 +66,7 @@ my_port = 0
 
 
 def keyCheck():
-    global my_x, my_y, my_x_velo, my_y_velo, current_time, SIGHT, bullet_fired, frame_time
+    global my_x, my_y, my_x_velo, my_y_velo, current_time, sight, bullet_fired, frame_time
 
     for event in pygame.event.get():
         if event.type == QUIT:
@@ -145,16 +130,16 @@ def keyCheck():
         my_y_velo = 0
 
     if keys_press[pygame.K_a]:
-        SIGHT -= WAY_TO_SEE * frame_time
+        sight -= WAY_TO_SEE * frame_time
     if keys_press[pygame.K_d]:
-        SIGHT += WAY_TO_SEE * frame_time
+        sight += WAY_TO_SEE * frame_time
 
-    degree = SIGHT / 360
+    degree = sight / 360
 
     if degree < 0:
-        SIGHT += 360
+        sight += 360
     elif degree > 1:
-        SIGHT -= 360
+        sight -= 360
 
     if keys_press[pygame.K_SPACE]:
         bullet_fired = True
@@ -164,7 +149,7 @@ def draw_my_ball():
     pygame.draw.circle(main_display, black, (my_x, my_y), 12)
 
 
-def draw_others_ball():
+def draw_others():
     if connected:
         for key, value in players_info.items():
             # print(key, my_port)
@@ -184,7 +169,7 @@ def draw_my_bullet():
     global fired_sight, fired_bullet_x, fired_bullet_y, fired_my_x_velo, fired_my_y_velo, bullet_fired
 
     if not bullet_fired:
-        degree = math.pi * 2 * SIGHT / 360
+        degree = math.pi * 2 * sight / 360
         bullet_x = 18 * math.cos(degree) + my_x
         bullet_y = 18 * math.sin(degree) + my_y
         pygame.draw.circle(main_display, black, (bullet_x, bullet_y), 4)
@@ -192,7 +177,7 @@ def draw_my_bullet():
         fired_bullet_y = bullet_y
         fired_my_x_velo = my_x_velo
         fired_my_y_velo = my_y_velo
-        fired_sight = SIGHT
+        fired_sight = sight
     else:
         degree = math.pi * 2 * fired_sight / 360
         bullet_x_speed = math.cos(degree) * 500
@@ -205,29 +190,26 @@ def draw_my_bullet():
             bullet_fired = False
 
 
-def respawn():
+def check_hp():
     global my_x, my_y
-    my_x = width / 2
-    my_y = height / 2
-
-
-def crash_detect():
-    global my_hit, others_hit
-    my_hit = others_hit = False
-    if my_x - 10 < othersBulletX < my_x + 10 and my_y - 10 < othersBulletY < my_y + 10:
-        my_hit = True
-        respawn()
+    try:
+        if players_info[my_port][4] <= 0:
+            my_x = width / 2
+            my_y = height / 2
+    except Exception as e:
+        print("check hp failed" + str(e))
 
 
 def send_and_recv():
-    global othersX, othersY, othersSight, othersBulletX, othersBulletY, connected, try_connect, players_info, my_port
-    while True:
+    global try_connect, players_info, my_port, connected
+
+    # recv my port num
+    my_port = server_socket.recv(512).decode()
+    print("받은 나의 포트: " + my_port)
+    while connected:
         if quit_event.is_set():
             return
         try:
-            # recv my port num
-            my_port = server_socket.recv(32).decode()
-
             # recv
             recv_info_json = server_socket.recv(512).decode()  # 서버가 보낸 메시지 반환
             recv_info = json.loads(recv_info_json.replace("'", "\""))
@@ -237,11 +219,12 @@ def send_and_recv():
             # send
             location = [my_x, my_y, fired_bullet_x, fired_bullet_y]
             send_info = json.dumps(location)
-            # print(sys.getsizeof(send_info.encode()))
-            print(sys.getsizeof(send_info))
             server_socket.send(send_info.encode())
         except Exception as e:
             print("send recv 중에 예외 발생" + str(e))
+            try_connect = False
+            connected = False
+            return
 
 
 def connect_as_client():
@@ -256,38 +239,46 @@ def connect_and_interact():
     try:
         print("접속시도")
         server_socket = connect_as_client()
-        threading.Thread(target=send_and_recv).start()
         connected = True
+        threading.Thread(target=send_and_recv).start()
+
     except Exception as e:
-        try_connect = False
-        connected = False
         print("접속 실패" + str(e))
-        pass
+        connected = False
+        try_connect = False
 
 
-server_soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+pygame.init()  # 초기화
+pygame.display.set_caption('Two Balls')
+main_display = pygame.display.set_mode((width, height), 0, 32)
+clock = pygame.time.Clock()  # 시간 설정
 while True:
     if quit_event.is_set():
         break
     keys_press = pygame.key.get_pressed()
+
     if keys_press[pygame.K_c] and connected is False and try_connect is False:
-        threading.Thread(target=connect_and_interact).start()
         try_connect = True
+        server_soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        threading.Thread(target=connect_and_interact).start()
         print("connecting true")
 
     if server_socket and keys_press[pygame.K_x] and connected is True:
         server_socket.close()
         connected = False
+        try_connect = False
         print("connecting false")
 
     main_display.fill(white)
+
     keyCheck()
+
     draw_my_bullet()
     draw_my_ball()
 
     if connected:
-        crash_detect()
-        draw_others_ball()
+        draw_others()
+        check_hp()
 
     pygame.display.update()  # 화면을 업데이트한다
     clock.tick(fps)  # 화면 표시 회수 설정만큼 루프의 간격을 둔다
