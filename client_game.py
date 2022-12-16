@@ -22,7 +22,8 @@ SERVER_IP = socket_address.SERVER_IP
 SERVER_PORT = socket_address.SERVER_PORT
 SIZE = socket_address.SIZE
 SERVER_ADDR = socket_address.SERVER_ADDR
-BUFF_SIZE = 1024
+BUFF_LEN = 1024
+ID_BUFF_LEN = 5
 
 width = 600  # 상수 설정
 height = 400
@@ -163,8 +164,6 @@ def draw_others():
 
 def draw_me():
     global fired_sight, fired_bullet_x, fired_bullet_y, fired_my_x_velo, fired_my_y_velo, bullet_fired
-    print(MY_ID)
-    print(players_info)
     try:
         if players_info[MY_ID][HP] > 0:
             # draw my character
@@ -198,8 +197,10 @@ def draw_me():
 def send_and_recv():
     global try_connect, players_info, MY_ID, connected
     connected = True
+
+    time.sleep(1)
     # recv my port num
-    MY_ID = server_socket.recv(BUFF_SIZE).decode()
+    MY_ID = server_socket.recv(ID_BUFF_LEN).decode()
     print("받은 나의 포트: " + MY_ID)
 
     while connected:
@@ -207,7 +208,7 @@ def send_and_recv():
             return
         try:
             # recv
-            recv_info_json = server_socket.recv(BUFF_SIZE).decode()  # 서버가 보낸 메시지 반환
+            recv_info_json = server_socket.recv(BUFF_LEN).decode()  # 서버가 보낸 메시지 반환
             recv_info = json.loads(recv_info_json.replace("'", "\""))
             # print(recv_info)
             players_info = recv_info
@@ -216,6 +217,7 @@ def send_and_recv():
             my_info = [my_x, my_y, fired_bullet_x, fired_bullet_y]
             send_info = json.dumps(my_info)
             server_socket.send(send_info.encode())
+            print(len(str(send_info.encode())))
         except Exception as e:
             print("send recv 중에 예외 발생" + str(e))
             try_connect = False
@@ -232,7 +234,7 @@ def connect_to_server():
             try:
                 server_soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 server_soc.connect(SERVER_ADDR)  # 서버에 접속
-                server_soc.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, BUFF_SIZE)
+                server_soc.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, BUFF_LEN)
                 server_socket = server_soc
                 print("접속 시도")
 
@@ -251,7 +253,7 @@ pygame.display.set_caption('Two Balls')
 main_display = pygame.display.set_mode((width, height), 0, 32)
 clock = pygame.time.Clock()  # 시간 설정
 
-players_info[MY_ID] = [0, 0, 0, 0, 100]
+players_info[MY_ID] = [-100, -100, -100, -100, 100]
 
 connect_thread = threading.Thread(target=connect_to_server)
 connect_thread.daemon = True

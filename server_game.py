@@ -22,7 +22,7 @@ IP = socket_address.IP
 PORT = socket_address.SERVER_PORT
 SIZE = socket_address.SIZE
 ADDR = socket_address.ADDR
-BUFF_SIZE = 1024
+BUFF_LEN = 1024
 
 print(PORT, IP)
 width = 600  # 상수 설정
@@ -211,7 +211,7 @@ def collide_detect():
                 player_x = player_info[POS_X]
                 player_y = player_info[POS_Y]
                 for other_player, other_player_info in players_info.items():
-                    if other_player != player:
+                    if other_player != player and other_player_info[HP] > 0:
                         bullet_x = other_player_info[BULLET_POS_X]
                         bullet_y = other_player_info[BULLET_POS_Y]
                         if player_x - 10 < bullet_x < player_x + 10 and player_y - 10 < bullet_y < player_y + 10:
@@ -240,6 +240,10 @@ def listen():
 def accept_client():
     while True:
         print("accept 진입")
+
+        players_info_json = json.dumps(players_info)
+        send_info = players_info_json.encode()
+        print("현재 players_info 전송 size: " + str(sys.getsizeof(send_info)))
         if server_soc:
             try:
                 client_socket, client_addr = server_soc.accept()
@@ -250,7 +254,7 @@ def accept_client():
 
                 print("client addr " + client_ip, client_port)
 
-                players_info[client_port] = [0, 0, 0, 0, 100]   # 플레이어를 dict에 추가
+                players_info[client_port] = [-100, -100, -100, -100, 100]   # 플레이어를 dict에 추가
                 print('준비완료')
                 threading.Thread(target=send_and_recv, args=(client_socket, client_port)).start()
                 print("thread 실행 시킴")
@@ -262,7 +266,7 @@ def send_and_recv(client_socket, client_port):
     # send client port
     client_socket.sendall(str(client_port).encode())
     print("send port to client")
-    print(sys.getsizeof(str(client_port).encode()))
+    print(len(str(client_port).encode()))
 
     while True:
         if quit_event.is_set():
@@ -272,15 +276,16 @@ def send_and_recv(client_socket, client_port):
             players_info_json = json.dumps(players_info)
             send_info = players_info_json.encode()
             client_socket.sendall(send_info)
-            print("send info to client")
+            print(len(str(send_info)))
+            # print("send info to client")
 
             # recv
-            recv_info_json = client_socket.recv(BUFF_SIZE).decode()
+            recv_info_json = client_socket.recv(BUFF_LEN).decode()
             recv_info = json.loads(recv_info_json.replace("'", "\""))
             player_hp = players_info[client_port][HP]
             recv_info.append(player_hp)
             players_info[client_port] = recv_info
-            print("recv info to client")
+            # print("recv info to client")
 
         except Exception as e:
             print("error occurred during send recv " + str(e))
@@ -304,7 +309,7 @@ clock = pygame.time.Clock()  # 시간 설정
 
 players_info[MY_ID] = [0, 0, 0, 0, 100]
 server_soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-server_soc.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, BUFF_SIZE)
+server_soc.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, BUFF_LEN)
 
 listen()
 accept_thread = threading.Thread(target=accept_client)
