@@ -5,31 +5,30 @@ import time
 import threading
 import re
 import socket
-import socket_adress
+import socket_address
 import math
-
+import json
 """
-socket_adress.py
+socket_address.py
 
-IP = 'Server Internal IP'
-PORT = Server port_number
+SERVER_IP = 'Server External IP'
+SERVER_PORT = Server port_number
 SIZE = Size of sending data
-ADDR = (IP, PORT)
+SERVER_ADDR = (SERVER_IP, SERVER_PORT)
 
 """
 
-IP = socket_adress.IP
-PORT = socket_adress.SERVER_PORT
-SIZE = socket_adress.SIZE
-ADDR = socket_adress.ADDR
+SERVER_IP = socket_address.SERVER_IP
+SERVER_PORT = socket_address.SERVER_PORT
+SIZE = socket_address.SIZE
+SERVER_ADDR = socket_address.SERVER_ADDR
 
 width = 600  # 상수 설정
 height = 400
 white = (255, 255, 255)
 black = (0, 0, 0)
 red = (255, 0, 0)
-blue = (0, 0, 255)
-fps = 200
+fps = 120
 
 pygame.init()  # 초기화
 
@@ -44,6 +43,7 @@ RUN_SPEED_MPS = (RUN_SPEED_MPM / 60.0)
 RUN_SPEED_PPS = int(RUN_SPEED_MPS * PIXEL_PER_METER)
 
 FRICTION = int(RUN_SPEED_MPS / 3 * PIXEL_PER_METER * 30)
+
 
 current_time = time.time()
 my_x = 300
@@ -71,52 +71,21 @@ fired_my_y_velo = 0
 my_hit = False
 others_hit = False
 frame_time = 1
-connecting = False
+connected = False
+try_connect = False
+server_socket = None
 
-client_socket = None
-
-
-def receive():
-    global othersX, othersY, othersSight, othersBulletX, othersBulletY
-    while True:
-        client_location = client_socket.recv(SIZE)  # 클라이언트가 보낸 메시지 반환
-        # print('받은거 ' + client_location.decode())
-        AllRex = r'^(.+)[ \t](.+)[ \t](.+)[ \t](.+)'
-        RAll = re.compile(AllRex)
-        MAll = RAll.search(client_location.decode())
-        othersX = int(MAll.group(1))
-        othersY = int(MAll.group(2))
-        othersBulletX = int(MAll.group(3))
-        othersBulletY = int(MAll.group(4))
-        # pygame.draw.circle(main_display, red, (othersX, othersY), 10)
-
-
-def send():
-    while True:
-        x = "%03d" % my_x
-        y = "%03d" % my_y
-        bullet_x = "%03d" % fired_bullet_x
-        bullet_y = "%03d" % fired_bullet_y
-        location = f'{x} {y} {bullet_x} {bullet_y}'
-        # print('보내는거 ' + location)
-        client_socket.sendall(location.encode())
-        time.sleep(0.005)
-
-
-def connect_as_server():
-    server_soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server_soc.bind(ADDR)  # 주소 바인딩
-    print('클라이언트를 기다리는 중')
-    server_soc.listen()  # 클라이언트의 요청을 받을 준비
-    client_soc, client_addr = server_soc.accept()
-    print('준비완료')
-    return client_soc
+quit_event = threading.Event()
+players_info = {}
+my_port = 0
 
 
 def keyCheck():
     global my_x, my_y, my_x_velo, my_y_velo, current_time, SIGHT, bullet_fired, frame_time
+
     for event in pygame.event.get():
         if event.type == QUIT:
+            quit_event.set()
             pygame.quit()
             sys.exit()
 
@@ -196,18 +165,29 @@ def draw_my_ball():
 
 
 def draw_others_ball():
-    pygame.draw.circle(main_display, red, (othersBulletX, othersBulletY), 4)
-    pygame.draw.circle(main_display, red, (othersX, othersY), 12)
+    if connected:
+        for key, value in players_info.items():
+            # print(key, my_port)
+            # print(players_info)
+            if key != my_port:
+                # print(value, type(value))
+                if value:
+                    x = value[0]
+                    y = value[1]
+                    bullet_x = value[2]
+                    bullet_y = value[3]
+                    pygame.draw.circle(main_display, red, (bullet_x, bullet_y), 4)
+                    pygame.draw.circle(main_display, red, (x, y), 12)
 
 
 def draw_my_bullet():
     global fired_sight, fired_bullet_x, fired_bullet_y, fired_my_x_velo, fired_my_y_velo, bullet_fired
+
     if not bullet_fired:
         degree = math.pi * 2 * SIGHT / 360
         bullet_x = 18 * math.cos(degree) + my_x
         bullet_y = 18 * math.sin(degree) + my_y
         pygame.draw.circle(main_display, black, (bullet_x, bullet_y), 4)
-
         fired_bullet_x = bullet_x
         fired_bullet_y = bullet_y
         fired_my_x_velo = my_x_velo
@@ -239,26 +219,73 @@ def crash_detect():
         respawn()
 
 
-while True:
-    keys_press = pygame.key.get_pressed()
-    if keys_press[pygame.K_c] and connecting is False:
-        client_socket = connect_as_server()
-        threading.Thread(target=receive).start()
-        threading.Thread(target=send).start()
-        connecting = True
+def send_and_recv():
+    global othersX, othersY, othersSight, othersBulletX, othersBulletY, connected, try_connect, players_info, my_port
+    while True:
+        if quit_event.is_set():
+            return
+        try:
+            # recv my port num
+            my_port = server_socket.recv(32).decode()
 
-    if keys_press[pygame.K_x] and connecting is True:
-        client_socket.close()
-        connecting = False
+            # recv
+            recv_info_json = server_socket.recv(512).decode()  # 서버가 보낸 메시지 반환
+            recv_info = json.loads(recv_info_json.replace("'", "\""))
+            # print(recv_info)
+            players_info = recv_info
+
+            # send
+            location = [my_x, my_y, fired_bullet_x, fired_bullet_y]
+            send_info = json.dumps(location)
+            # print(sys.getsizeof(send_info.encode()))
+            print(sys.getsizeof(send_info))
+            server_socket.send(send_info.encode())
+        except Exception as e:
+            print("send recv 중에 예외 발생" + str(e))
+
+
+def connect_as_client():
+    server_soc.connect(SERVER_ADDR)  # 서버에 접속
+    print('접속됨')
+    print(server_soc.getsockname())
+    return server_soc
+
+
+def connect_and_interact():
+    global server_socket, connected, try_connect
+    try:
+        print("접속시도")
+        server_socket = connect_as_client()
+        threading.Thread(target=send_and_recv).start()
+        connected = True
+    except Exception as e:
+        try_connect = False
+        connected = False
+        print("접속 실패" + str(e))
+        pass
+
+
+server_soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+while True:
+    if quit_event.is_set():
+        break
+    keys_press = pygame.key.get_pressed()
+    if keys_press[pygame.K_c] and connected is False and try_connect is False:
+        threading.Thread(target=connect_and_interact).start()
+        try_connect = True
+        print("connecting true")
+
+    if server_socket and keys_press[pygame.K_x] and connected is True:
+        server_socket.close()
+        connected = False
+        print("connecting false")
 
     main_display.fill(white)
     keyCheck()
     draw_my_bullet()
     draw_my_ball()
 
-    #print(frame_time)
-
-    if connecting:
+    if connected:
         crash_detect()
         draw_others_ball()
 
