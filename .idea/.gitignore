@@ -184,3 +184,10 @@ ENV/
 
 # mkdocs documentation
 /site
+
+pygame/*
+venv/*
+build/*
+encodings/*
+__pycache__/*
+
