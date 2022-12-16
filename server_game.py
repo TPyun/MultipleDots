@@ -154,46 +154,44 @@ def keyCheck():
 
 def draw_clients():
     for key, value in players_info.items():
-        # print(players_info)
-        if key != 0:
-            # print(value, type(value))
-            if value:
-                x = value[POS_X]
-                y = value[POS_Y]
-                bullet_x = value[BULLET_POS_X]
-                bullet_y = value[BULLET_POS_Y]
-                pygame.draw.circle(main_display, red, (bullet_x, bullet_y), 4)
-                pygame.draw.circle(main_display, red, (x, y), 12)
+        if key != 0 and value and value[HP] > 0:
+            x = value[POS_X]
+            y = value[POS_Y]
+            bullet_x = value[BULLET_POS_X]
+            bullet_y = value[BULLET_POS_Y]
+            pygame.draw.circle(main_display, red, (bullet_x, bullet_y), 4)
+            pygame.draw.circle(main_display, red, (x, y), 12)
 
 
 def draw_me():
     global fired_sight, fired_bullet_x, fired_bullet_y, fired_my_x_velo, fired_my_y_velo, bullet_fired
 
-    # draw my character
-    pygame.draw.circle(main_display, black, (my_x, my_y), 12)
+    if players_info[MY_ID][HP] > 0:
+        # draw my character
+        pygame.draw.circle(main_display, black, (my_x, my_y), 12)
 
-    # draw my bullet
-    if not bullet_fired:
-        degree = math.pi * 2 * sight / 360
-        bullet_x = 18 * math.cos(degree) + my_x
-        bullet_y = 18 * math.sin(degree) + my_y
-        pygame.draw.circle(main_display, black, (bullet_x, bullet_y), 4)
+        # draw my bullet
+        if not bullet_fired:
+            degree = math.pi * 2 * sight / 360
+            bullet_x = 18 * math.cos(degree) + my_x
+            bullet_y = 18 * math.sin(degree) + my_y
+            pygame.draw.circle(main_display, black, (bullet_x, bullet_y), 4)
 
-        fired_bullet_x = bullet_x
-        fired_bullet_y = bullet_y
-        fired_my_x_velo = my_x_velo
-        fired_my_y_velo = my_y_velo
-        fired_sight = sight
-    else:
-        degree = math.pi * 2 * fired_sight / 360
-        bullet_x_speed = math.cos(degree) * 500
-        bullet_y_speed = math.sin(degree) * 500
+            fired_bullet_x = bullet_x
+            fired_bullet_y = bullet_y
+            fired_my_x_velo = my_x_velo
+            fired_my_y_velo = my_y_velo
+            fired_sight = sight
+        else:
+            degree = math.pi * 2 * fired_sight / 360
+            bullet_x_speed = math.cos(degree) * 500
+            bullet_y_speed = math.sin(degree) * 500
 
-        fired_bullet_x += (fired_my_x_velo + bullet_x_speed) * frame_time
-        fired_bullet_y += (fired_my_y_velo + bullet_y_speed) * frame_time
-        pygame.draw.circle(main_display, black, (fired_bullet_x, fired_bullet_y), 4)
-        if fired_bullet_x < 0 or fired_bullet_x > width or fired_bullet_y < 0 or fired_bullet_y > height:
-            bullet_fired = False
+            fired_bullet_x += (fired_my_x_velo + bullet_x_speed) * frame_time
+            fired_bullet_y += (fired_my_y_velo + bullet_y_speed) * frame_time
+            pygame.draw.circle(main_display, black, (fired_bullet_x, fired_bullet_y), 4)
+            if fired_bullet_x < 0 or fired_bullet_x > width or fired_bullet_y < 0 or fired_bullet_y > height:
+                bullet_fired = False
 
 
 def check_hp():
@@ -209,15 +207,16 @@ def check_hp():
 def collide_detect():
     try:
         for player, player_info in players_info.items():
-            player_x = player_info[POS_X]
-            player_y = player_info[POS_Y]
-            for other_player, other_player_info in players_info.items():
-                if other_player is not player:
-                    bullet_x = other_player_info[BULLET_POS_X]
-                    bullet_y = other_player_info[BULLET_POS_Y]
-                    if player_x - 10 < bullet_x < player_x + 10 and player_y - 10 < bullet_y < player_y + 10:
-                        if player_info[HP] > 0:
-                            player_info[HP] -= 100
+            if player_info[HP] > 0:
+                player_x = player_info[POS_X]
+                player_y = player_info[POS_Y]
+                for other_player, other_player_info in players_info.items():
+                    if other_player != player:
+                        bullet_x = other_player_info[BULLET_POS_X]
+                        bullet_y = other_player_info[BULLET_POS_Y]
+                        if player_x - 10 < bullet_x < player_x + 10 and player_y - 10 < bullet_y < player_y + 10:
+                            if player_info[HP] > 0:
+                                player_info[HP] -= 100
     except Exception as e:
         print("collide detect fail " + str(e))
 

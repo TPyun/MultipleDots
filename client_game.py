@@ -59,11 +59,15 @@ fired_my_y_velo = 0
 
 connected = False
 try_connect = False
-server_socket = None
 
 quit_event = threading.Event()
 players_info = {}
-my_port = 0
+MY_ID = 0
+POS_X = 0
+POS_Y = 1
+BULLET_POS_X = 2
+BULLET_POS_Y = 3
+HP = 4
 
 
 def keyCheck():
@@ -147,63 +151,56 @@ def keyCheck():
 
 
 def draw_others():
-    if connected:
-        for key, value in players_info.items():
-            if key != my_port:
-                if value:
-                    x = value[0]
-                    y = value[1]
-                    bullet_x = value[2]
-                    bullet_y = value[3]
-                    pygame.draw.circle(main_display, red, (bullet_x, bullet_y), 4)
-                    pygame.draw.circle(main_display, red, (x, y), 12)
+    for key, value in players_info.items():
+        if key != MY_ID and value and value[HP] > 0:
+            x = value[POS_X]
+            y = value[POS_Y]
+            bullet_x = value[BULLET_POS_X]
+            bullet_y = value[BULLET_POS_Y]
+            pygame.draw.circle(main_display, red, (bullet_x, bullet_y), 4)
+            pygame.draw.circle(main_display, red, (x, y), 12)
 
 
 def draw_me():
     global fired_sight, fired_bullet_x, fired_bullet_y, fired_my_x_velo, fired_my_y_velo, bullet_fired
-
-    # draw my character
-    pygame.draw.circle(main_display, black, (my_x, my_y), 12)
-
-    # draw my bullet
-    if not bullet_fired:
-        degree = math.pi * 2 * sight / 360
-        bullet_x = 18 * math.cos(degree) + my_x
-        bullet_y = 18 * math.sin(degree) + my_y
-        pygame.draw.circle(main_display, black, (bullet_x, bullet_y), 4)
-        fired_bullet_x = bullet_x
-        fired_bullet_y = bullet_y
-        fired_my_x_velo = my_x_velo
-        fired_my_y_velo = my_y_velo
-        fired_sight = sight
-    else:
-        degree = math.pi * 2 * fired_sight / 360
-        bullet_x_speed = math.cos(degree) * 500
-        bullet_y_speed = math.sin(degree) * 500
-
-        fired_bullet_x += (fired_my_x_velo + bullet_x_speed) * frame_time
-        fired_bullet_y += (fired_my_y_velo + bullet_y_speed) * frame_time
-        pygame.draw.circle(main_display, black, (fired_bullet_x, fired_bullet_y), 4)
-        if fired_bullet_x < 0 or fired_bullet_x > width or fired_bullet_y < 0 or fired_bullet_y > height:
-            bullet_fired = False
-
-
-def check_hp():
-    global my_x, my_y
+    print(MY_ID)
+    print(players_info)
     try:
-        if players_info[my_port][4] <= 0:
-            my_x = width / 2
-            my_y = height / 2
+        if players_info[MY_ID][HP] > 0:
+            # draw my character
+            pygame.draw.circle(main_display, black, (my_x, my_y), 12)
+
+            # draw my bullet
+            if not bullet_fired:
+                degree = math.pi * 2 * sight / 360
+                bullet_x = 18 * math.cos(degree) + my_x
+                bullet_y = 18 * math.sin(degree) + my_y
+                pygame.draw.circle(main_display, black, (bullet_x, bullet_y), 4)
+                fired_bullet_x = bullet_x
+                fired_bullet_y = bullet_y
+                fired_my_x_velo = my_x_velo
+                fired_my_y_velo = my_y_velo
+                fired_sight = sight
+            else:
+                degree = math.pi * 2 * fired_sight / 360
+                bullet_x_speed = math.cos(degree) * 500
+                bullet_y_speed = math.sin(degree) * 500
+
+                fired_bullet_x += (fired_my_x_velo + bullet_x_speed) * frame_time
+                fired_bullet_y += (fired_my_y_velo + bullet_y_speed) * frame_time
+                pygame.draw.circle(main_display, black, (fired_bullet_x, fired_bullet_y), 4)
+                if fired_bullet_x < 0 or fired_bullet_x > width or fired_bullet_y < 0 or fired_bullet_y > height:
+                    bullet_fired = False
     except Exception as e:
-        print("check hp failed" + str(e))
+        print("draw me 중에 예외 " + str(e))
 
 
 def send_and_recv():
-    global try_connect, players_info, my_port, connected
+    global try_connect, players_info, MY_ID, connected
     connected = True
     # recv my port num
-    my_port = server_socket.recv(BUFF_SIZE).decode()
-    print("받은 나의 포트: " + my_port)
+    MY_ID = server_socket.recv(BUFF_SIZE).decode()
+    print("받은 나의 포트: " + MY_ID)
 
     while connected:
         if quit_event.is_set():
@@ -216,8 +213,8 @@ def send_and_recv():
             players_info = recv_info
 
             # send
-            location = [my_x, my_y, fired_bullet_x, fired_bullet_y]
-            send_info = json.dumps(location)
+            my_info = [my_x, my_y, fired_bullet_x, fired_bullet_y]
+            send_info = json.dumps(my_info)
             server_socket.send(send_info.encode())
         except Exception as e:
             print("send recv 중에 예외 발생" + str(e))
@@ -254,6 +251,8 @@ pygame.display.set_caption('Two Balls')
 main_display = pygame.display.set_mode((width, height), 0, 32)
 clock = pygame.time.Clock()  # 시간 설정
 
+players_info[MY_ID] = [0, 0, 0, 0, 100]
+
 connect_thread = threading.Thread(target=connect_to_server)
 connect_thread.daemon = True
 connect_thread.start()
@@ -263,18 +262,18 @@ while True:
         break
     keys_press = pygame.key.get_pressed()
 
-    if server_socket and keys_press[pygame.K_x] and connected is True:
-        server_socket.close()
-        connected = False
-        try_connect = False
-        print("connecting false")
+    # if server_socket and keys_press[pygame.K_x] and connected is True:
+    #     server_socket.close()
+    #     connected = False
+    #     try_connect = False
+    #     print("connecting false")
 
     main_display.fill(white)
     keyCheck()
+
     draw_me()
     if connected:
         draw_others()
-        check_hp()
 
     pygame.display.update()  # 화면을 업데이트한다
     clock.tick(fps)  # 화면 표시 회수 설정만큼 루프의 간격을 둔다
