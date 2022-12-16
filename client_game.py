@@ -145,17 +145,10 @@ def keyCheck():
         bullet_fired = True
 
 
-def draw_my_ball():
-    pygame.draw.circle(main_display, black, (my_x, my_y), 12)
-
-
 def draw_others():
     if connected:
         for key, value in players_info.items():
-            # print(key, my_port)
-            # print(players_info)
             if key != my_port:
-                # print(value, type(value))
                 if value:
                     x = value[0]
                     y = value[1]
@@ -165,9 +158,13 @@ def draw_others():
                     pygame.draw.circle(main_display, red, (x, y), 12)
 
 
-def draw_my_bullet():
+def draw_me():
     global fired_sight, fired_bullet_x, fired_bullet_y, fired_my_x_velo, fired_my_y_velo, bullet_fired
 
+    # draw my character
+    pygame.draw.circle(main_display, black, (my_x, my_y), 12)
+
+    # draw my bullet
     if not bullet_fired:
         degree = math.pi * 2 * sight / 360
         bullet_x = 18 * math.cos(degree) + my_x
@@ -206,6 +203,7 @@ def send_and_recv():
     # recv my port num
     my_port = server_socket.recv(512).decode()
     print("받은 나의 포트: " + my_port)
+
     while connected:
         if quit_event.is_set():
             return
@@ -270,12 +268,8 @@ while True:
         print("connecting false")
 
     main_display.fill(white)
-
     keyCheck()
-
-    draw_my_bullet()
-    draw_my_ball()
-
+    draw_me()
     if connected:
         draw_others()
         check_hp()

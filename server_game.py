@@ -151,10 +151,6 @@ def keyCheck():
         bullet_fired = True
 
 
-def draw_my_ball():
-    pygame.draw.circle(main_display, black, (my_x, my_y), 12)
-
-
 def draw_clients():
     for key, value in players_info.items():
         # print(players_info)
@@ -169,8 +165,13 @@ def draw_clients():
                 pygame.draw.circle(main_display, red, (x, y), 12)
 
 
-def draw_my_bullet():
+def draw_me():
     global fired_sight, fired_bullet_x, fired_bullet_y, fired_my_x_velo, fired_my_y_velo, bullet_fired
+
+    # draw my character
+    pygame.draw.circle(main_display, black, (my_x, my_y), 12)
+
+    # draw my bullet
     if not bullet_fired:
         degree = math.pi * 2 * sight / 360
         bullet_x = 18 * math.cos(degree) + my_x
@@ -306,10 +307,7 @@ while True:
     main_display.fill(white)
 
     keyCheck()
-
-    draw_my_bullet()
-    draw_my_ball()
-
+    draw_me()
     if len(players_info) > 1:
         add_me()
         check_hp()
