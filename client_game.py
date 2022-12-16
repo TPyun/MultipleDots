@@ -22,6 +22,7 @@ SERVER_IP = socket_address.SERVER_IP
 SERVER_PORT = socket_address.SERVER_PORT
 SIZE = socket_address.SIZE
 SERVER_ADDR = socket_address.SERVER_ADDR
+BUFF_SIZE = 1024
 
 width = 600  # 상수 설정
 height = 400
@@ -199,9 +200,9 @@ def check_hp():
 
 def send_and_recv():
     global try_connect, players_info, my_port, connected
-
+    connected = True
     # recv my port num
-    my_port = server_socket.recv(512).decode()
+    my_port = server_socket.recv(BUFF_SIZE).decode()
     print("받은 나의 포트: " + my_port)
 
     while connected:
@@ -209,7 +210,7 @@ def send_and_recv():
             return
         try:
             # recv
-            recv_info_json = server_socket.recv(512).decode()  # 서버가 보낸 메시지 반환
+            recv_info_json = server_socket.recv(BUFF_SIZE).decode()  # 서버가 보낸 메시지 반환
             recv_info = json.loads(recv_info_json.replace("'", "\""))
             # print(recv_info)
             players_info = recv_info
@@ -225,41 +226,42 @@ def send_and_recv():
             return
 
 
-def connect_as_client():
-    server_soc.connect(SERVER_ADDR)  # 서버에 접속
-    print('접속됨')
-    print(server_soc.getsockname())
-    return server_soc
-
-
-def connect_and_interact():
+def connect_to_server():
     global server_socket, connected, try_connect
-    try:
-        print("접속시도")
-        server_socket = connect_as_client()
-        connected = True
-        threading.Thread(target=send_and_recv).start()
+    while True:
+        if quit_event.is_set():
+            break
+        if not connected:
+            try:
+                server_soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                server_soc.connect(SERVER_ADDR)  # 서버에 접속
+                server_soc.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, BUFF_SIZE)
+                server_socket = server_soc
+                print("접속 시도")
 
-    except Exception as e:
-        print("접속 실패" + str(e))
-        connected = False
-        try_connect = False
+                threading.Thread(target=send_and_recv).start()
+            except Exception as e:
+                print("접속 실패 " + str(e))
+                connected = False
+                try_connect = False
+                time.sleep(10)
+        else:
+            time.sleep(10)
 
 
 pygame.init()  # 초기화
 pygame.display.set_caption('Two Balls')
 main_display = pygame.display.set_mode((width, height), 0, 32)
 clock = pygame.time.Clock()  # 시간 설정
+
+connect_thread = threading.Thread(target=connect_to_server)
+connect_thread.daemon = True
+connect_thread.start()
+
 while True:
     if quit_event.is_set():
         break
     keys_press = pygame.key.get_pressed()
-
-    if keys_press[pygame.K_c] and connected is False and try_connect is False:
-        try_connect = True
-        server_soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        threading.Thread(target=connect_and_interact).start()
-        print("connecting true")
 
     if server_socket and keys_press[pygame.K_x] and connected is True:
         server_socket.close()

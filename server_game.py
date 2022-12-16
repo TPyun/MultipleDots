@@ -22,6 +22,7 @@ IP = socket_address.IP
 PORT = socket_address.SERVER_PORT
 SIZE = socket_address.SIZE
 ADDR = socket_address.ADDR
+BUFF_SIZE = 1024
 
 print(PORT, IP)
 width = 600  # 상수 설정
@@ -223,15 +224,18 @@ def collide_detect():
 
 def listen():
     global server_soc
-    try:
-        server_soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        server_soc.bind(ADDR)  # 주소 바인딩
-        server_soc.listen()  # 클라이언트의 요청을 받을 준비
-        print('listen')
-    except Exception as e:
-        print("listen 하지 못함" + str(e))
-        time.sleep(5)
-        listen()
+    listen_success = False
+    while not listen_success:
+        try:
+            server_soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            server_soc.bind(ADDR)  # 주소 바인딩
+            server_soc.listen()  # 클라이언트의 요청을 받을 준비
+            listen_success = True
+            print('listen')
+        except Exception as e:
+            print("listen 하지 못함" + str(e))
+            time.sleep(10)
+            listen()
 
 
 def accept_client():
@@ -245,7 +249,7 @@ def accept_client():
                 client_ip = client_addr[0]
                 client_port = client_addr[1]
 
-                print(client_ip, client_port)
+                print("client addr " + client_ip, client_port)
 
                 players_info[client_port] = [0, 0, 0, 0, 100]   # 플레이어를 dict에 추가
                 print('준비완료')
@@ -259,6 +263,8 @@ def send_and_recv(client_socket, client_port):
     # send client port
     client_socket.sendall(str(client_port).encode())
     print("send port to client")
+    print(sys.getsizeof(str(client_port).encode()))
+
     while True:
         if quit_event.is_set():
             return
@@ -270,7 +276,7 @@ def send_and_recv(client_socket, client_port):
             print("send info to client")
 
             # recv
-            recv_info_json = client_socket.recv(1024).decode()
+            recv_info_json = client_socket.recv(BUFF_SIZE).decode()
             recv_info = json.loads(recv_info_json.replace("'", "\""))
             player_hp = players_info[client_port][HP]
             recv_info.append(player_hp)
@@ -299,6 +305,8 @@ clock = pygame.time.Clock()  # 시간 설정
 
 players_info[MY_ID] = [0, 0, 0, 0, 100]
 server_soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+server_soc.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, BUFF_SIZE)
+
 listen()
 accept_thread = threading.Thread(target=accept_client)
 accept_thread.daemon = True
