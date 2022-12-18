@@ -191,6 +191,14 @@ def draw_me():
                 if fired_bullet_x < 0 or fired_bullet_x > width or fired_bullet_y < 0 or fired_bullet_y > height:
                     bullet_fired = False
         else:
+            degree = math.pi * 2 * sight / 360
+            bullet_x = 18 * math.cos(degree) + my_x
+            bullet_y = 18 * math.sin(degree) + my_y
+            fired_bullet_x = bullet_x
+            fired_bullet_y = bullet_y
+            fired_my_x_velo = my_x_velo
+            fired_my_y_velo = my_y_velo
+            fired_sight = sight
             bullet_fired = False
 
     except Exception as e:

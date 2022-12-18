@@ -198,17 +198,28 @@ def draw_me():
             if fired_bullet_x < 0 or fired_bullet_x > width or fired_bullet_y < 0 or fired_bullet_y > height:
                 bullet_fired = False
     else:
+        degree = math.pi * 2 * sight / 360
+        bullet_x = 18 * math.cos(degree) + my_x
+        bullet_y = 18 * math.sin(degree) + my_y
+        fired_bullet_x = bullet_x
+        fired_bullet_y = bullet_y
+        fired_my_x_velo = my_x_velo
+        fired_my_y_velo = my_y_velo
+        fired_sight = sight
         bullet_fired = False
 
 
-def check_hp():
-    global my_x, my_y
-    try:
-        if players_info[MY_ID][HP] <= 0:
-            my_x = width / 2
-            my_y = height / 2
-    except Exception as e:
-        print("check hp 실패 " + str(e))
+def game_over_check():
+    while True:
+        alive_player = 0
+        for player, player_info in players_info.items():
+            if player_info[HP] > 0:
+                alive_player += 1
+        if alive_player == 1:
+            time.sleep(5)
+            for player, player_info in players_info.items():
+                player_info[HP] = 100
+        time.sleep(1)
 
 
 def collide_detect():
@@ -322,6 +333,7 @@ listen()
 accept_thread = threading.Thread(target=accept_client)
 accept_thread.daemon = True
 accept_thread.start()
+threading.Thread(target=game_over_check).start()
 
 while True:
     main_display.fill(white)
@@ -330,7 +342,6 @@ while True:
     draw_me()
     if len(players_info) > 1:
         add_me()
-        # check_hp()
         collide_detect()
         draw_clients()
 
