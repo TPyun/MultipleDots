@@ -190,6 +190,9 @@ def draw_me():
                 pygame.draw.circle(main_display, black, (fired_bullet_x, fired_bullet_y), 4)
                 if fired_bullet_x < 0 or fired_bullet_x > width or fired_bullet_y < 0 or fired_bullet_y > height:
                     bullet_fired = False
+        else:
+            bullet_fired = False
+
     except Exception as e:
         print("draw me 중에 예외 " + str(e))
 
@@ -214,7 +217,7 @@ def send_and_recv():
             players_info = recv_info
 
             # send
-            my_info = [my_x, my_y, fired_bullet_x, fired_bullet_y]
+            my_info = [int(my_x), int(my_y), int(fired_bullet_x), int(fired_bullet_y)]
             send_info = json.dumps(my_info)
             server_socket.send(send_info.encode())
             print(len(str(send_info.encode())))
@@ -249,7 +252,7 @@ def connect_to_server():
 
 
 pygame.init()  # 초기화
-pygame.display.set_caption('Two Balls')
+pygame.display.set_caption('MultipleDots')
 main_display = pygame.display.set_mode((width, height), 0, 32)
 clock = pygame.time.Clock()  # 시간 설정
 

@@ -78,8 +78,13 @@ def keyCheck():
             quit_event.set()
             pygame.quit()
             sys.exit()
+    # 로그 띄우기
     if keys_press[pygame.K_l]:
         print(players_info)
+    # 플레이어 피 회복
+    if keys_press[pygame.K_r]:
+        for player, player_info in players_info.items():
+            player_info[HP] = 100
 
     if keys_press[pygame.K_LEFT]:
         my_x_velo -= (RUN_SPEED_PPS * frame_time * 100)
@@ -192,6 +197,8 @@ def draw_me():
             pygame.draw.circle(main_display, black, (fired_bullet_x, fired_bullet_y), 4)
             if fired_bullet_x < 0 or fired_bullet_x > width or fired_bullet_y < 0 or fired_bullet_y > height:
                 bullet_fired = False
+    else:
+        bullet_fired = False
 
 
 def check_hp():
@@ -216,7 +223,7 @@ def collide_detect():
                         bullet_y = other_player_info[BULLET_POS_Y]
                         if player_x - 10 < bullet_x < player_x + 10 and player_y - 10 < bullet_y < player_y + 10:
                             if player_info[HP] > 0:
-                                player_info[HP] -= 100
+                                player_info[HP] -= 10
     except Exception as e:
         print("collide detect fail " + str(e))
 
@@ -299,7 +306,7 @@ def add_me():
         my_hp = players_info[MY_ID][HP]
     except Exception as e:
         print("add me exception " + str(e))
-    players_info[MY_ID] = [my_x, my_y, fired_bullet_x, fired_bullet_y, my_hp]
+    players_info[MY_ID] = [int(my_x), int(my_y), int(fired_bullet_x), int(fired_bullet_y), my_hp]
 
 
 pygame.init()  # 초기화
@@ -323,7 +330,7 @@ while True:
     draw_me()
     if len(players_info) > 1:
         add_me()
-        check_hp()
+        # check_hp()
         collide_detect()
         draw_clients()
 
