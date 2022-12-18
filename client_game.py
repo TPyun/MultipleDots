@@ -22,8 +22,10 @@ SERVER_IP = socket_address.SERVER_IP
 SERVER_PORT = socket_address.SERVER_PORT
 SIZE = socket_address.SIZE
 SERVER_ADDR = socket_address.SERVER_ADDR
-BUFF_LEN = 1024
-ID_BUFF_LEN = 5
+
+PLAYER_INFO_LEN = 23
+PLAYERS_LIST_LEN = 512
+ID_LEN = 5
 
 width = 600  # 상수 설정
 height = 400
@@ -71,7 +73,7 @@ BULLET_POS_Y = 3
 HP = 4
 
 
-def keyCheck():
+def key_check():
     global my_x, my_y, my_x_velo, my_y_velo, current_time, sight, bullet_fired, frame_time
 
     for event in pygame.event.get():
@@ -211,7 +213,7 @@ def send_and_recv():
 
     time.sleep(1)
     # recv my port num
-    MY_ID = server_socket.recv(ID_BUFF_LEN).decode()
+    MY_ID = server_socket.recv(ID_LEN).decode()
     print("받은 나의 포트: " + MY_ID)
 
     while connected:
@@ -219,14 +221,15 @@ def send_and_recv():
             return
         try:
             # recv
-            recv_info_json = server_socket.recv(BUFF_LEN).decode()  # 서버가 보낸 메시지 반환
+            recv_info_json = server_socket.recv(PLAYERS_LIST_LEN).decode()  # 서버가 보낸 메시지 반환
             recv_info = json.loads(recv_info_json.replace("'", "\""))
-            # print(recv_info)
+            print(recv_info)
             players_info = recv_info
 
             # send
             my_info = [int(my_x), int(my_y), int(fired_bullet_x), int(fired_bullet_y)]
             send_info = json.dumps(my_info)
+            print(len(str(send_info.encode())))
             server_socket.send(send_info.encode())
             print(len(str(send_info.encode())))
         except Exception as e:
@@ -245,7 +248,7 @@ def connect_to_server():
             try:
                 server_soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 server_soc.connect(SERVER_ADDR)  # 서버에 접속
-                server_soc.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, BUFF_LEN)
+                server_soc.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, PLAYER_INFO_LEN)
                 server_socket = server_soc
                 print("접속 시도")
 
@@ -282,7 +285,7 @@ while True:
     #     print("connecting false")
 
     main_display.fill(white)
-    keyCheck()
+    key_check()
 
     draw_me()
     if connected:
