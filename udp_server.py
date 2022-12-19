@@ -8,16 +8,6 @@ import socket_address
 import math
 import json
 
-"""
-socket_address.py
-
-IP = 'Server Internal IP'
-PORT = Server port_number
-SIZE = Size of sending data
-ADDR = (IP, PORT)
-
-"""
-
 IP = socket_address.IP
 PORT = socket_address.SERVER_PORT
 ADDR = socket_address.ADDR
@@ -160,7 +150,7 @@ def keyCheck():
 
 def draw_clients():
     for key, value in players_info.items():
-        if key != 0 and value and value[HP] > 0:
+        if key != 0:
             x = value[POS_X]
             y = value[POS_Y]
             bullet_x = value[BULLET_POS_X]
@@ -172,42 +162,30 @@ def draw_clients():
 def draw_me():
     global fired_sight, fired_bullet_x, fired_bullet_y, fired_my_x_velo, fired_my_y_velo, bullet_fired
 
-    if players_info[MY_ID][HP] > 0:
-        # draw my character
-        pygame.draw.circle(main_display, black, (my_x, my_y), 12)
+    pygame.draw.circle(main_display, black, (my_x, my_y), 12)
 
-        # draw my bullet
-        if not bullet_fired:
-            degree = math.pi * 2 * sight / 360
-            bullet_x = 18 * math.cos(degree) + my_x
-            bullet_y = 18 * math.sin(degree) + my_y
-            pygame.draw.circle(main_display, black, (bullet_x, bullet_y), 4)
-
-            fired_bullet_x = bullet_x
-            fired_bullet_y = bullet_y
-            fired_my_x_velo = my_x_velo
-            fired_my_y_velo = my_y_velo
-            fired_sight = sight
-        else:
-            degree = math.pi * 2 * fired_sight / 360
-            bullet_x_speed = math.cos(degree) * 500
-            bullet_y_speed = math.sin(degree) * 500
-
-            fired_bullet_x += (fired_my_x_velo + bullet_x_speed) * frame_time
-            fired_bullet_y += (fired_my_y_velo + bullet_y_speed) * frame_time
-            pygame.draw.circle(main_display, black, (fired_bullet_x, fired_bullet_y), 4)
-            if fired_bullet_x < 0 or fired_bullet_x > width or fired_bullet_y < 0 or fired_bullet_y > height:
-                bullet_fired = False
-    else:
+    # draw my bullet
+    if not bullet_fired:
         degree = math.pi * 2 * sight / 360
         bullet_x = 18 * math.cos(degree) + my_x
         bullet_y = 18 * math.sin(degree) + my_y
+        pygame.draw.circle(main_display, black, (bullet_x, bullet_y), 4)
+
         fired_bullet_x = bullet_x
         fired_bullet_y = bullet_y
         fired_my_x_velo = my_x_velo
         fired_my_y_velo = my_y_velo
         fired_sight = sight
-        bullet_fired = False
+    else:
+        degree = math.pi * 2 * fired_sight / 360
+        bullet_x_speed = math.cos(degree) * 500
+        bullet_y_speed = math.sin(degree) * 500
+
+        fired_bullet_x += (fired_my_x_velo + bullet_x_speed) * frame_time
+        fired_bullet_y += (fired_my_y_velo + bullet_y_speed) * frame_time
+        pygame.draw.circle(main_display, black, (fired_bullet_x, fired_bullet_y), 4)
+        if fired_bullet_x < 0 or fired_bullet_x > width or fired_bullet_y < 0 or fired_bullet_y > height:
+            bullet_fired = False
 
 
 def game_over_check():
@@ -240,75 +218,35 @@ def collide_detect():
         print("collide detect fail " + str(e))
 
 
-def listen():
-    global server_soc
-    listen_success = False
-    while not listen_success:
-        try:
-            server_soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            server_soc.bind(ADDR)  # 주소 바인딩
-            server_soc.listen()  # 클라이언트의 요청을 받을 준비
-            listen_success = True
-            print('listen')
-        except Exception as e:
-            print("listen 하지 못함" + str(e))
-            time.sleep(10)
-
-
-def accept_client():
-    while True:
-        print("accept 진입")
-
-        players_info_json = json.dumps(players_info)
-        send_info = players_info_json.encode()
-        print("현재 players_info 전송 size: " + str(sys.getsizeof(send_info)))
-        if server_soc:
-            try:
-                client_socket, client_addr = server_soc.accept()
-
-                print(client_socket.getsockname())
-                client_ip = client_addr[0]
-                client_port = client_addr[1]
-
-                print("client addr " + client_ip, client_port)
-
-                players_info[client_port] = [-100, -100, -100, -100, 100]   # 플레이어를 dict에 추가
-                print('준비완료')
-                threading.Thread(target=send_and_recv, args=(client_socket, client_port)).start()
-                print("thread 실행 시킴")
-            except Exception as e:
-                print("accept 실패" + str(e))
-
-
-def send_and_recv(client_socket, client_port):
-    # send client port
-    client_socket.sendall(str(client_port).encode())
-    print("send port to client")
-    print(client_port)
-    print(len(str(client_port).encode()))
-
+def send_and_recv():
     while True:
         if quit_event.is_set():
             return
         try:
+            # recv
+            encoded_recv = udp_socket.recvfrom(1024)
+            encoded_recv_info = encoded_recv[0]
+            address = encoded_recv[1]
+            recv_info = encoded_recv_info.decode()
+            recv_info = json.loads(recv_info.replace("'", "\""))
+            ip = address[0]
+            port = address[1]
+            # print(recv_info, ip, port)
+            # print(type(recv_info))
+            players_info[port] = recv_info
+            # print(players_info)
+
             # send
-            players_info_json = json.dumps(players_info)
+            send_info_port = [players_info, port]
+            players_info_json = json.dumps(send_info_port)
             send_info = players_info_json.encode()
-            client_socket.sendall(send_info)
+            udp_socket.sendto(send_info, address)
             # print(len(str(send_info)))
             # print("send info to client")
 
-            # recv
-            recv_info_json = client_socket.recv(PLAYER_INFO_LEN).decode()
-            recv_info = json.loads(recv_info_json.replace("'", "\""))
-            player_hp = players_info[client_port][HP]
-            recv_info.append(player_hp)
-            players_info[client_port] = recv_info
-            # print(recv_info)
-
         except Exception as e:
             print("error occurred during send recv " + str(e))
-            players_info.pop(client_port)
+            # players_info.pop(client_port)
             return
 
 
@@ -320,6 +258,7 @@ def add_me():
         print("add me exception " + str(e))
     players_info[MY_ID] = [int(my_x), int(my_y), int(fired_bullet_x), int(fired_bullet_y), my_hp]
 
+bufferSize  = 1024
 
 pygame.init()  # 초기화
 pygame.display.set_caption('MultipleDots')
@@ -327,17 +266,13 @@ main_display = pygame.display.set_mode((width, height), 0, 32)
 clock = pygame.time.Clock()  # 시간 설정
 
 players_info[MY_ID] = [0, 0, 0, 0, 100]
-server_soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-server_soc.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, PLAYERS_LIST_LEN)
 
-listen()
-accept_thread = threading.Thread(target=accept_client)
-accept_thread.daemon = True
-accept_thread.start()
+udp_socket = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
+udp_socket.bind(ADDR)
 
-game_over_check_thread = threading.Thread(target=game_over_check)
-game_over_check_thread.daemon = True
-game_over_check_thread.start()
+send_recv_thread = threading.Thread(target=send_and_recv)
+send_recv_thread.daemon = True
+send_recv_thread.start()
 
 while True:
     main_display.fill(white)
@@ -346,8 +281,10 @@ while True:
     draw_me()
     if len(players_info) > 1:
         add_me()
-        collide_detect()
+        # collide_detect()
         draw_clients()
 
     pygame.display.update()  # 화면을 업데이트한다
     clock.tick(fps)  # 화면 표시 회수 설정만큼 루프의 간격을 둔다
+
+
