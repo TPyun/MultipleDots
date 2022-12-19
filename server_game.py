@@ -336,7 +336,10 @@ listen()
 accept_thread = threading.Thread(target=accept_client)
 accept_thread.daemon = True
 accept_thread.start()
-threading.Thread(target=game_over_check).start()
+
+game_over_check_thread = threading.Thread(target=game_over_check)
+game_over_check_thread.daemon = True
+game_over_check_thread.start()
 
 while True:
     main_display.fill(white)
