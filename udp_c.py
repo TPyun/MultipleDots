@@ -1,17 +1,24 @@
 import socket
+import cv2
+import socket_address
 
-msgFromClient       = "Hello UDP Server"
-bytesToSend         = str.encode(msgFromClient)
-serverAddressPort   = ("127.0.0.1", 20001)
-bufferSize          = 1024
+SERVER_ADDR = socket_address.SERVER_ADDR
 
 # 클라이언트 쪽에서 UDP 소켓 생성
 UDPClientSocket = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
 
-# 생성된 UDP 소켓을 사용하여 서버로 전송
-UDPClientSocket.sendto(bytesToSend, serverAddressPort)
 
-msgFromServer = UDPClientSocket.recvfrom(bufferSize)
+capture = cv2.VideoCapture(0)
+capture.set(cv2.CAP_PROP_FRAME_WIDTH, 100)
+capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 100)
 
-msg = "Message from Server {}".format(msgFromServer[0])
-print(msg)
+while True:
+    ret, frame = capture.read()
+    d = frame.flatten()
+    s = d.tostring()
+
+    for i in range(20):
+        UDPClientSocket.sendto(bytes([i]) + s[i*46080:(i+1)*46080], SERVER_ADDR)
+
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
