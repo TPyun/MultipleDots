@@ -1,41 +1,36 @@
 import socket
-import numpy
-import cv2
-import socket_address
+import numpy as np
+import cv2 as cv
 
-ADDR = socket_address.ADDR
 
-msgFromServer       = "Hello UDP Client"
-bytesToSend         = str.encode(msgFromServer)
+addr = ("127.0.0.1", 65534)
+buf = 512
+width = 640
+height = 480
+code = b'start'
+num_of_chunks = width * height * 3 / buf
 
-# 데이터그램 소켓을 생성
-UDPServerSocket = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
+if __name__ == '__main__':
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.bind(addr)
+    while True:
+        chunks = []
+        start = False
+        while len(chunks) < num_of_chunks:
+            chunk, _ = s.recvfrom(buf)
+            if start:
+                chunks.append(chunk)
+            elif chunk.startswith(code):
+                start = True
 
-# 주소와 IP로 Bind
-UDPServerSocket.bind(ADDR)
+        byte_frame = b''.join(chunks)
 
-print("UDP server up and listening")
+        frame = np.frombuffer(
+            byte_frame, dtype=np.uint8).reshape(height, width, 3)
 
-s = [b'\xff' * 46080 for x in range(20)]
-
-fourcc = cv2.VideoWriter_fourcc(*'DIVX')
-out = cv2.VideoWriter('output.avi', fourcc, 25.0, (640, 480))
-
-while True:
-    picture = b''
-
-    data, addr = UDPServerSocket.recvfrom(46081)
-    s[data[0]] = data[1:46081]
-
-    if data[0] == 19:
-        for i in range(20):
-            picture += s[i]
-
-        frame = numpy.fromstring(picture, dtype=numpy.uint8)
-        frame = frame.reshape(480, 640, 3)
-        cv2.imshow("frame", frame)
-        out.write(frame)
-
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            cv2.destroyAllWindows()
+        cv.imshow('recv', frame)
+        if cv.waitKey(1) & 0xFF == ord('q'):
             break
+
+    s.close()
+    cv.destroyAllWindows()
